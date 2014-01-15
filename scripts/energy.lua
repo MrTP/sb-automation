@@ -159,7 +159,7 @@ end
 
 -- returns true if object is a valid energy receiver
 function energy.canReceiveEnergy()
-  return energy.getUnusedCapacity() > 20
+  return energy.getUnusedCapacity() > 0
 end
 
 -- connects to the specified entity id
@@ -234,7 +234,7 @@ function energy.sendEnergy()
   for entityId, v in pairs(energy.connections) do
     if not energy.sourcesThisTick[entityId] and not energy.sourcesLastTick[entityId] then
       local thisEnergyNeed = world.callScriptedEntity(entityId, "energy.getUnusedCapacity")
-      if thisEnergyNeed then
+      if thisEnergyNeed and thisEnergyNeed > 0 then
         energyNeeds[#energyNeeds + 1] = {entityId, thisEnergyNeed}
       end
     end
