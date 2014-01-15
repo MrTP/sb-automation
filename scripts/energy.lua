@@ -48,7 +48,8 @@ function energy.init()
   energy.connections = {}
 
   --prevent looping
-  energy.recentSources = {}
+  energy.sourcesThisTick = {}
+  energy.sourcesLastTick = {}
 end
 
 -- performs any unloading necessary when the object is removed (MUST BE CALLED IN OBJECT die() FUNCTION)
@@ -114,7 +115,14 @@ end
 
 -- Adds the specified amount of energy to the storage pool, to a maximum of <energy.capacity>
 -- returns the total amount of energy accepted
-function energy.receiveEnergy(amount)
+function energy.receiveEnergy(amount, entityId)
+  if (entityId) then
+    world.logInfo("adding %d to sources list", entityId)
+    energy.sourcesThisTick[entityId] = true
+  else
+    world.logInfo("YER DOIN IT RONG")
+  end
+
   local newEnergy = energy.getEnergy() + amount
   if newEnergy <= energy.getCapacity() then
     energy.setEnergy(newEnergy)
@@ -129,9 +137,6 @@ end
 -- reduces the current energy pool by the specified amount, to a minimum of 0
 function energy.removeEnergy(amount, entityId)
   energy.setEnergy(math.max(0, energy.getEnergy() - amount))
-  if (entityId) then
-    energy.recentSources[entityId] = true
-  end
 end
 
 -- attempt to remove the specified amount of energy
@@ -227,7 +232,7 @@ function energy.sendEnergy()
 
   -- check energy needs for all connected entities
   for entityId, v in pairs(energy.connections) do
-    if not energy.recentSources[entityId] then
+    if not energy.sourcesThisTick[entityId] and not energy.sourcesLastTick[entityId] then
       local thisEnergyNeed = world.callScriptedEntity(entityId, "energy.getUnusedCapacity")
       if thisEnergyNeed then
         energyNeeds[#energyNeeds + 1] = {entityId, thisEnergyNeed}
@@ -246,7 +251,7 @@ function energy.sendEnergy()
   while #energyNeeds > 0 do
     if energyNeeds[1][2] > 0 then
       local sendAmt = remainingEnergyToSend / #energyNeeds
-      remainingEnergyToSend = remainingEnergyToSend - world.callScriptedEntity(energyNeeds[1][1], "energy.receiveEnergy", sendAmt)
+      remainingEnergyToSend = remainingEnergyToSend - world.callScriptedEntity(energyNeeds[1][1], "energy.receiveEnergy", sendAmt, entity.id())
     end
     table.remove(energyNeeds, 1)
   end
@@ -256,6 +261,7 @@ function energy.sendEnergy()
   world.logInfo("%s %d successfully sent %d energy", entity.configParameter("objectName"), entity.id(), totalSent)
   energy.removeEnergy(totalSent)
 
-  --reset anti-looping table
-  energy.recentSources = {}
+  --reset anti-looping tables
+  energy.sourcesLastTick = energy.sourcesThisTick
+  energy.sourcesThisTick = {}
 end
